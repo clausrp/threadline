@@ -9,11 +9,94 @@ const seed = {
     { id: "legal", name: "Estate planning", color: "green", started: "May 18, 2026", entries: [{ type: "meeting", date: "Aug 19, 2026", title: "Meeting with solicitor", description: "Reviewed the first draft of the will and next steps.", tags: ["Minutes added"] }]}
   ],
   upcoming: [
-    { day: "15", month: "SEP", title: "Neurology appointment", meta: "Tue, 10:30 AM  •  Mum's health journey" },
-    { day: "19", month: "SEP", title: "Contractor site visit", meta: "Sat, 2:00 PM  •  House renovation" }
+    { day: "15", month: "SEP", title: "Neurology appointment", meta: "Tue, 10:30 AM  •  Mum's health journey", location: "St Mary's Hospital" },
+    { day: "19", month: "SEP", title: "Contractor site visit", meta: "Sat, 2:00 PM  •  House renovation", location: "14 Oak Street" }
   ]
 };
-let data = JSON.parse(localStorage.getItem("threadline-data") || "null") || seed;
+const DATA_STORAGE_KEY = "threadline-data";
+const DATA_BACKUP_KEY = "threadline-data-backup";
+const RECORD_JOURNAL_KEY = "threadline-record-journal";
+const STRUCTURED_DB_NAME = "threadline-structured-data";
+const STRUCTURED_STORE_NAME = "snapshots";
+const STRUCTURED_SNAPSHOT_ID = "current";
+const createId = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+function openStructuredDatabase() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(STRUCTURED_DB_NAME, 1);
+    request.onupgradeneeded = () => request.result.createObjectStore(STRUCTURED_STORE_NAME, { keyPath: "id" });
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+async function saveStructuredSnapshot(snapshot) {
+  try {
+    const db = await openStructuredDatabase();
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(STRUCTURED_STORE_NAME, "readwrite");
+      transaction.objectStore(STRUCTURED_STORE_NAME).put({ id: STRUCTURED_SNAPSHOT_ID, data: snapshot });
+      transaction.oncomplete = resolve;
+      transaction.onerror = () => reject(transaction.error);
+    });
+    db.close();
+  } catch (error) {
+    console.warn("Unable to save the structured Threadline snapshot.", error);
+  }
+}
+async function readStructuredSnapshot() {
+  try {
+    const db = await openStructuredDatabase();
+    const snapshot = await new Promise((resolve, reject) => {
+      const request = db.transaction(STRUCTURED_STORE_NAME, "readonly").objectStore(STRUCTURED_STORE_NAME).get(STRUCTURED_SNAPSHOT_ID);
+      request.onsuccess = () => resolve(request.result?.data || null);
+      request.onerror = () => reject(request.error);
+    });
+    db.close();
+    return snapshot && Array.isArray(snapshot.processes) && Array.isArray(snapshot.upcoming) ? snapshot : null;
+  } catch (error) {
+    console.warn("Unable to read the structured Threadline snapshot.", error);
+    return null;
+  }
+}
+function readStoredData(key) {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || "null");
+    return value && Array.isArray(value.processes) && Array.isArray(value.upcoming) ? value : null;
+  } catch (error) {
+    console.warn(`Unable to read ${key}.`, error);
+    return null;
+  }
+}
+function ensureStableIds() {
+  let changed = false;
+  data.processes?.forEach((process) => process.entries?.forEach((entry) => {
+    if (!entry.id) {
+      entry.id = createId("entry");
+      changed = true;
+    }
+  }));
+  data.upcoming?.forEach((meeting) => {
+    if (!meeting.id) {
+      meeting.id = createId("meeting");
+      changed = true;
+    }
+  });
+  data.workspaces?.forEach((workspace) => {
+    workspace.processes?.forEach((process) => process.entries?.forEach((entry) => {
+      if (!entry.id) {
+        entry.id = createId("entry");
+        changed = true;
+      }
+    }));
+    workspace.upcoming?.forEach((meeting) => {
+      if (!meeting.id) {
+        meeting.id = createId("meeting");
+        changed = true;
+      }
+    });
+  });
+  return changed;
+}
+let data = readStoredData(DATA_STORAGE_KEY) || readStoredData(DATA_BACKUP_KEY) || seed;
 if (!data.workspaces) {
   data = {
     users: [
@@ -40,25 +123,210 @@ data.users ||= [{ id: "alex", name: "Alex Morgan", email: "alex@example.com" }];
 data.users.forEach((user) => { user.role ||= user.id === "alex" ? "admin" : "user"; });
 data.workspaces ||= [];
 data.activeWorkspaceId ||= data.workspaces[0]?.id;
+function reconcileActiveWorkspace() {
+  const workspace = data.workspaces.find((item) => item.id === data.activeWorkspaceId) || data.workspaces[0];
+  if (!workspace) return;
+  data.activeWorkspaceId = workspace.id;
+  const key = (record) => record.id || `${record.title || ""}|${record.date || ""}|${record.time || ""}`;
+  const topProcesses = data.processes || [];
+  const workspaceProcesses = workspace.processes || [];
+  const mergedProcesses = topProcesses.map((process) => {
+    const matchingWorkspace = workspaceProcesses.find((item) => item.id === process.id);
+    if (!matchingWorkspace) return process;
+    const entries = [...(process.entries || [])];
+    (matchingWorkspace.entries || []).forEach((entry) => {
+      if (!entries.some((item) => key(item) === key(entry))) entries.push(entry);
+    });
+    return { ...matchingWorkspace, ...process, entries };
+  });
+  workspaceProcesses.forEach((process) => {
+    if (!mergedProcesses.some((item) => item.id === process.id)) mergedProcesses.push(process);
+  });
+  data.processes = workspace.processes = mergedProcesses;
+  data.upcoming = workspace.upcoming = [...(data.upcoming || []), ...(workspace.upcoming || []).filter((meeting) => !data.upcoming.some((item) => key(item) === key(meeting)))];
+}
+reconcileActiveWorkspace();
+function readRecordJournal() {
+  try {
+    const value = JSON.parse(localStorage.getItem(RECORD_JOURNAL_KEY) || "{}");
+    return value && typeof value === "object" ? value : {};
+  } catch {
+    return {};
+  }
+}
+function recordKey(record) {
+  return record.id || `${record.title || ""}|${record.date || ""}|${record.time || ""}`;
+}
+function restoreRecordJournal() {
+  const journal = readRecordJournal();
+  Object.values(journal).forEach((record) => {
+    if (record.kind === "upcoming") {
+      if (!data.upcoming.some((item) => recordKey(item) === recordKey(record))) data.upcoming.push(record);
+      return;
+    }
+    const process = data.processes.find((item) => item.id === record.processId || item.name === record.processName) || data.processes[0];
+    if (process && !process.entries.some((item) => recordKey(item) === recordKey(record))) process.entries.push(record);
+  });
+}
+function removeJournalRecord(id) {
+  if (!id) return;
+  const journal = readRecordJournal();
+  delete journal[id];
+  localStorage.setItem(RECORD_JOURNAL_KEY, JSON.stringify(journal));
+}
+restoreRecordJournal();
 const activeWorkspace = () => data.workspaces.find((workspace) => workspace.id === data.activeWorkspaceId) || data.workspaces[0];
 const currentUser = () => data.users.find((user) => user.id === activeWorkspace()?.ownerId) || data.users[0];
 const isAdmin = () => currentUser()?.role === "admin";
 const dashboardDefaults = { process: true, upcoming: true, insight: true };
+let viewState = JSON.parse(localStorage.getItem("threadline-view") || "{}");
+function removeLegacyRecordingData() {
+  data.workspaces.forEach((workspace) => workspace.processes?.forEach((process) => process.entries?.forEach((entry) => {
+    if (entry.recordingData?.data) {
+      entry.recordingData = { name: entry.recordingData.name || "Recording", type: entry.recordingData.type || "application/octet-stream", size: entry.recordingData.data.length };
+    }
+  })));
+}
+function ensureUpcomingLocations() {
+  const knownLocations = {
+    "Neurology appointment": "St Mary's Hospital",
+    "Contractor site visit": "14 Oak Street",
+    "Removal company estimate": "Current home",
+    "Tutor check-in": "Online"
+  };
+  data.upcoming?.forEach((meeting) => { meeting.location ||= knownLocations[meeting.title] || "To be confirmed"; });
+}
+function promoteDueMeetings() {
+  const now = Date.now();
+  const remaining = [];
+  let promoted = false;
+  data.upcoming?.forEach((meeting) => {
+    if (meeting.status === "completed" || !meeting.date || new Date(`${meeting.date}T${meeting.time || "23:59"}`).getTime() > now) {
+      remaining.push(meeting);
+      return;
+    }
+    const process = data.processes.find((item) => item.id === meeting.processId || item.name === meeting.processName) || data.processes[0];
+    if (process) {
+      if (!process.entries.some((entry) => entry.id === meeting.id)) {
+        process.entries.unshift({
+          id: meeting.id || createId("entry"),
+          type: "meeting",
+          date: new Date(`${meeting.date}T${meeting.time || "12:00"}`).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
+          title: meeting.title,
+          description: meeting.description || "Upcoming meeting completed.",
+          location: meeting.location || "",
+          tags: ["Minutes added"]
+        });
+      }
+      meeting.status = "completed";
+      meeting.completedAt = new Date().toISOString();
+      const journal = readRecordJournal();
+      journal[meeting.id] = {
+        id: meeting.id,
+        type: "meeting",
+        date: new Date(`${meeting.date}T${meeting.time || "12:00"}`).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
+        title: meeting.title,
+        description: meeting.description || "Upcoming meeting completed.",
+        location: meeting.location || "",
+        tags: ["Minutes added"],
+        kind: "history",
+        processId: process.id,
+        processName: process.name
+      };
+      localStorage.setItem(RECORD_JOURNAL_KEY, JSON.stringify(journal));
+      promoted = true;
+    }
+  });
+  data.upcoming = remaining;
+  return promoted;
+}
+removeLegacyRecordingData();
+ensureUpcomingLocations();
+const idsAdded = ensureStableIds();
+let promotedMeetings = false;
 function syncWorkspace() {
   const workspace = activeWorkspace();
   if (workspace) {
-    workspace.processes = data.processes;
-    workspace.upcoming = data.upcoming;
+    data.processes = workspace.processes = data.processes;
+    data.upcoming = workspace.upcoming = data.upcoming;
   }
 }
-let selectedId = data.processes[0]?.id;
+let selectedId = data.processes.some((process) => process.id === viewState.selectedId) ? viewState.selectedId : data.processes[0]?.id;
 let editingUserId = null;
 let editingIndex = null;
-let showAllEntries = false;
-let activeFilter = "all";
-let searchTerm = "";
+let addingUpcomingMeeting = false;
+let upcomingEditingIndex = null;
+let showAllEntries = Boolean(viewState.showAllEntries);
+let activeFilter = viewState.activeFilter || "all";
+let searchTerm = viewState.searchTerm || "";
+let historySort = viewState.historySort === "oldest" ? "oldest" : "newest";
+let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 const $ = (s) => document.querySelector(s);
-const save = () => { syncWorkspace(); localStorage.setItem("threadline-data", JSON.stringify(data)); };
+function mergeRecordCollections(current, stored) {
+  const result = [...(current || [])];
+  (stored || []).forEach((record) => {
+    const key = record.id || `${record.title || ""}|${record.date || ""}|${record.time || ""}`;
+    const existingIndex = result.findIndex((item) => (item.id || `${item.title || ""}|${item.date || ""}|${item.time || ""}`) === key);
+    if (existingIndex < 0) result.push(record);
+  });
+  return result;
+}
+function mergeStoredRecords(snapshot) {
+  if (!snapshot) return;
+  const storedProcesses = snapshot.processes || [];
+  data.processes.forEach((process) => {
+    const storedProcess = storedProcesses.find((item) => item.id === process.id);
+    if (storedProcess) process.entries = mergeRecordCollections(process.entries, storedProcess.entries);
+  });
+  storedProcesses.forEach((process) => {
+    if (!data.processes.some((item) => item.id === process.id)) data.processes.push(process);
+  });
+  const historyIds = new Set(data.processes.flatMap((process) => process.entries || []).map((entry) => entry.id).filter(Boolean));
+  data.upcoming = mergeRecordCollections(
+    data.upcoming,
+    (snapshot.upcoming || []).filter((meeting) => meeting.status !== "completed" && !historyIds.has(meeting.id))
+  );
+}
+const save = () => {
+  removeLegacyRecordingData();
+  ensureStableIds();
+  mergeStoredRecords(readStoredData(DATA_STORAGE_KEY));
+  mergeStoredRecords(readStoredData(DATA_BACKUP_KEY));
+  syncWorkspace();
+  const journal = readRecordJournal();
+  data.upcoming.forEach((meeting) => { journal[recordKey(meeting)] = { ...meeting, kind: "upcoming" }; });
+  data.processes.forEach((process) => process.entries?.forEach((entry) => {
+    journal[recordKey(entry)] = { ...entry, kind: "history", processId: process.id, processName: process.name };
+  }));
+  localStorage.setItem(RECORD_JOURNAL_KEY, JSON.stringify(journal));
+  const serialized = JSON.stringify(data);
+  saveStructuredSnapshot(JSON.parse(serialized));
+  try {
+    localStorage.setItem(DATA_BACKUP_KEY, serialized);
+    localStorage.setItem(DATA_STORAGE_KEY, serialized);
+    if (localStorage.getItem(DATA_STORAGE_KEY) !== serialized) throw new Error("Saved data could not be verified.");
+    const workspace = activeWorkspace();
+    if (workspace && (workspace.processes !== data.processes || workspace.upcoming !== data.upcoming)) {
+      throw new Error("The active workspace could not be verified.");
+    }
+  } catch (error) {
+    throw new Error(`Threadline could not save your changes. ${error.message || "Browser storage may be unavailable or full."}`);
+  }
+};
+const verifyEntrySaved = (id) => {
+  const stores = [readStoredData(DATA_STORAGE_KEY), readStoredData(DATA_BACKUP_KEY)];
+  const found = stores.every((stored) => stored && (
+    stored.upcoming?.some((meeting) => meeting.id === id) ||
+    stored.processes?.some((process) => process.entries?.some((entry) => entry.id === id))
+  ));
+  const workspace = activeWorkspace();
+  const inWorkspace = Boolean(workspace && (
+    workspace.upcoming?.some((meeting) => meeting.id === id) ||
+    workspace.processes?.some((process) => process.entries?.some((entry) => entry.id === id))
+  ));
+  if (!found || !inWorkspace) throw new Error("The saved entry could not be verified in browser storage.");
+};
+const saveViewState = () => localStorage.setItem("threadline-view", JSON.stringify({ selectedId, showAllEntries, activeFilter, searchTerm, historySort }));
 const selected = () => data.processes.find((p) => p.id === selectedId) || data.processes[0] || { id: "", name: "No processes yet", entries: [] };
 function addDemoEntries() {
   const health = data.processes.find((p) => p.id === "health");
@@ -70,7 +338,6 @@ function addDemoEntries() {
     { type: "meeting", date: "Aug 13, 2026", title: "Initial appointment with Dr. Patel", description: "Collected the initial history and agreed on blood tests and a follow-up plan.", tags: ["Minutes added", "Recording"], recording: true },
     { type: "note", date: "Aug 12, 2026", title: "Started tracking the process", description: "Created this timeline to keep appointments, questions, and decisions together.", tags: ["Personal note"] }
   );
-  save();
 }
 function addTestProcesses() {
   const testProcesses = [
@@ -109,11 +376,31 @@ function addTestProcesses() {
   const existingIds = new Set(data.processes.map((process) => process.id));
   testProcesses.forEach((process) => { if (!existingIds.has(process.id)) data.processes.push(process); });
   const testMeetings = [
-    { day: "22", month: "SEP", title: "Removal company estimate", meta: "Tue, 5:30 PM  •  Moving house — test" },
-    { day: "26", month: "SEP", title: "Tutor check-in", meta: "Sat, 11:00 AM  •  Evening course — test" }
+    { date: "2026-09-16", time: "09:30", title: "Medication review", meta: "Wed, 9:30 AM  •  Mum's health journey", location: "GP practice", processId: "health", processName: "Mum's health journey" },
+    { date: "2026-09-18", time: "14:00", title: "Packing progress check", meta: "Fri, 2:00 PM  •  Moving house — test", location: "Current home", processId: "test-moving", processName: "Moving house — test" },
+    { date: "2026-09-23", time: "10:00", title: "Insurance documents review", meta: "Wed, 10:00 AM  •  Car insurance renewal — test", location: "Online", processId: "test-renewal", processName: "Car insurance renewal — test" },
+    { date: "2026-09-24", time: "18:30", title: "Course progress meeting", meta: "Thu, 6:30 PM  •  Evening course — test", location: "Classroom 2", processId: "test-course", processName: "Evening course — test" },
+    { date: "2026-09-30", time: "11:00", title: "Specialist preparation call", meta: "Wed, 11:00 AM  •  Mum's health journey", location: "Phone", processId: "health", processName: "Mum's health journey" },
+    { date: "2026-10-02", time: "15:00", title: "Removal plan confirmation", meta: "Fri, 3:00 PM  •  Moving house — test", location: "Online", processId: "test-moving", processName: "Moving house — test" },
+    { date: "2026-10-07", time: "09:00", title: "Renewal decision meeting", meta: "Wed, 9:00 AM  •  Car insurance renewal — test", location: "Insurance office", processId: "test-renewal", processName: "Car insurance renewal — test" },
+    { date: "2026-10-12", time: "18:00", title: "Assignment planning session", meta: "Mon, 6:00 PM  •  Evening course — test", location: "Classroom 2", processId: "test-course", processName: "Evening course — test" },
+    { date: "2026-10-16", time: "13:30", title: "Follow-up with neurology", meta: "Fri, 1:30 PM  •  Mum's health journey", location: "St Mary's Hospital", processId: "health", processName: "Mum's health journey" },
+    { date: "2026-10-24", time: "10:30", title: "Move-in readiness review", meta: "Sat, 10:30 AM  •  Moving house — test", location: "New home", processId: "test-moving", processName: "Moving house — test" },
+    { date: "2026-11-03", time: "16:00", title: "Policy renewal follow-up", meta: "Tue, 4:00 PM  •  Car insurance renewal — test", location: "Online", processId: "test-renewal", processName: "Car insurance renewal — test" },
+    { date: "2026-11-06", time: "18:30", title: "Tutor feedback session", meta: "Fri, 6:30 PM  •  Evening course — test", location: "Online", processId: "test-course", processName: "Evening course — test" },
+    { date: "2026-11-11", time: "10:00", title: "Health plan review", meta: "Wed, 10:00 AM  •  Mum's health journey", location: "GP practice", processId: "health", processName: "Mum's health journey" },
+    { date: "2026-11-18", time: "14:30", title: "Post-move check-in", meta: "Wed, 2:30 PM  •  Moving house — test", location: "New home", processId: "test-moving", processName: "Moving house — test" },
+    { date: "2026-11-27", time: "11:30", title: "Course term review", meta: "Fri, 11:30 AM  •  Evening course — test", location: "Classroom 2", processId: "test-course", processName: "Evening course — test" }
   ];
-  testMeetings.forEach((meeting) => { if (!data.upcoming.some((item) => item.title === meeting.title && item.meta === meeting.meta)) data.upcoming.push(meeting); });
-  save();
+  testMeetings.forEach((meeting) => {
+    if (data.upcoming.some((item) => item.title === meeting.title && item.date === meeting.date)) return;
+    const date = new Date(`${meeting.date}T${meeting.time}`);
+    data.upcoming.push({
+      ...meeting,
+      day: String(date.getDate()).padStart(2, "0"),
+      month: date.toLocaleDateString("en-US", { month: "short" }).toUpperCase()
+    });
+  });
 }
 function render() {
   const process = selected();
@@ -125,25 +412,40 @@ function render() {
   $("#active-count").textContent = data.processes.length;
   $("#selected-title").textContent = process.name;
   $("#breadcrumb-title").textContent = process.name;
-  const matchingEntries = process.entries.map((entry, index) => ({ entry, index })).filter(({ entry }) => activeFilter === "all" || entry.type === activeFilter).filter(({ entry }) => !searchTerm || `${entry.title} ${entry.description} ${entry.date}`.toLowerCase().includes(searchTerm.toLowerCase()));
+  const matchingEntries = process.entries.map((entry, index) => ({ entry, index })).filter(({ entry }) => activeFilter === "all" || entry.type === activeFilter).filter(({ entry }) => !searchTerm || `${entry.title} ${entry.description} ${entry.date}`.toLowerCase().includes(searchTerm.toLowerCase())).sort((a, b) => {
+    const difference = new Date(b.entry.date).getTime() - new Date(a.entry.date).getTime();
+    return historySort === "newest" ? difference : -difference;
+  });
   const visibleEntries = showAllEntries || activeFilter !== "all" || searchTerm ? matchingEntries : matchingEntries.slice(0, 4);
   $("#timeline").innerHTML = visibleEntries.length ? visibleEntries.map(({ entry: e, index }) => `<article class="timeline-entry ${e.type}" data-entry-index="${index}" title="Edit entry"><div class="entry-date">${e.date}</div><div class="entry-title">${e.title}</div><div class="entry-description">${e.description || ""}</div><div class="entry-tags">${(e.tags || []).map((t) => `<span class="tag ${t === "Recording" ? "recording-tag" : ""}">${t === "Recording" ? "◉ " : ""}${t}</span>`).join("")}</div></article>`).join("") : `<p class="empty-results">No matching events found.</p>`;
   $("#show-all").hidden = Boolean(searchTerm || activeFilter !== "all");
   $("#show-all").innerHTML = showAllEntries ? "Show fewer entries <span>↑</span>" : `View all ${process.entries.length} entries <span>→</span>`;
-  $("#upcoming-list").innerHTML = data.upcoming.map((m) => `<div class="upcoming-item"><div class="date-block"><strong>${m.day}</strong><small>${m.month}</small></div><div><h4>${m.title}</h4><p>${m.meta}</p></div></div>`).join("");
+  const upcomingEntries = data.upcoming.map((meeting, index) => ({ meeting, index })).filter(({ meeting }) => meeting.status !== "completed").sort((a, b) => {
+    const aDate = a.meeting.date ? new Date(`${a.meeting.date}T${a.meeting.time || "23:59"}`).getTime() : Number.MAX_SAFE_INTEGER;
+    const bDate = b.meeting.date ? new Date(`${b.meeting.date}T${b.meeting.time || "23:59"}`).getTime() : Number.MAX_SAFE_INTEGER;
+    return aDate - bDate;
+  });
+  $("#upcoming-list").innerHTML = upcomingEntries.map(({ meeting: m, index }) => `<div class="upcoming-item" data-upcoming-index="${index}" title="Edit upcoming meeting"><div class="date-block"><strong>${m.day}</strong><small>${m.month}</small></div><div><h4>${m.title}</h4><p>${m.meta}</p><p class="upcoming-location">⌖ ${m.location || "To be confirmed"}</p></div></div>`).join("");
+  document.querySelectorAll("[data-upcoming-index]").forEach((meeting) => meeting.addEventListener("click", () => openUpcomingEdit(Number(meeting.dataset.upcomingIndex))));
   $("#meeting-count").textContent = data.upcoming.length;
   $("#notes-count").textContent = data.processes.reduce((n, p) => n + p.entries.length, 0) + 9;
     document.querySelectorAll("[data-process]").forEach((b) => b.addEventListener("click", () => { selectedId = b.dataset.process; showAllEntries = false; render(); }));
     document.querySelectorAll("[data-process-menu]").forEach((b) => b.addEventListener("click", (event) => { event.stopPropagation(); document.querySelectorAll("[data-process-menu-panel]").forEach((panel) => { panel.hidden = panel.dataset.processMenuPanel !== b.dataset.processMenu; }); }));
     document.querySelectorAll("[data-share-process]").forEach((b) => b.addEventListener("click", () => openShareModal(b.dataset.shareProcess)));
   document.querySelectorAll("[data-entry-index]").forEach((entry) => entry.addEventListener("click", () => openEditModal(Number(entry.dataset.entryIndex))));
+    saveViewState();
 }
-function openModal() {
+function openModal(upcomingMeeting = false) {
   editingIndex = null;
-  $("#modal-eyebrow").textContent = "NEW TIMELINE ENTRY";
+  upcomingEditingIndex = null;
+  addingUpcomingMeeting = upcomingMeeting;
+  $("#modal-eyebrow").textContent = upcomingMeeting ? "NEW UPCOMING MEETING" : "NEW TIMELINE ENTRY";
   $("#modal-title").textContent = "Add a meeting";
-  $("#entry-form").querySelector("[type=submit]").textContent = "Save entry";
+  $("#entry-form").querySelector("[type=submit]").textContent = "Save";
   $("#delete-entry").hidden = true;
+  $("#entry-form").reset();
+  $("#recording-label").textContent = "Attach a recording";
+  $("#recording-status").textContent = "Audio or video; limited by available browser storage";
   $("#modal-backdrop").hidden = false;
   $("#entry-date").value = new Date().toISOString().slice(0, 10);
   $("#entry-title").focus();
@@ -160,12 +462,58 @@ function openEditModal(index) {
   $("#entry-title").value = entry.title;
   $("#entry-date").value = new Date(entry.date).toISOString().slice(0, 10);
   $("#entry-time").value = "10:00";
+  $("#entry-location").value = entry.location || "";
   $("#entry-notes").value = entry.description || "";
+  $("#recording-label").textContent = entry.recordingData?.name || (entry.recording ? "Recording attached" : "Attach a recording");
+  $("#recording-status").textContent = entry.recordingData ? "Recording ready to keep" : "Audio or video; limited by available browser storage";
   $("#modal-backdrop").hidden = false;
   $("#entry-title").focus();
 }
-function closeModal() { $("#modal-backdrop").hidden = true; $("#entry-form").reset(); editingIndex = null; }
+function closeModal() { $("#modal-backdrop").hidden = true; $("#entry-form").reset(); editingIndex = null; upcomingEditingIndex = null; addingUpcomingMeeting = false; }
+function openUpcomingEdit(index) {
+  const meeting = data.upcoming[index];
+  if (!meeting) return;
+  upcomingEditingIndex = index;
+  addingUpcomingMeeting = false;
+  editingIndex = null;
+  $("#modal-eyebrow").textContent = "EDIT UPCOMING MEETING";
+  $("#modal-title").textContent = "Edit meeting";
+  $("#entry-form").querySelector("[type=submit]").textContent = "Save changes";
+  $("#delete-entry").hidden = true;
+  $("#entry-type").value = "meeting";
+  $("#entry-title").value = meeting.title;
+  $("#entry-date").value = meeting.date || "";
+  $("#entry-time").value = meeting.time || "10:00";
+  $("#entry-location").value = meeting.location || "";
+  $("#entry-notes").value = meeting.description || "";
+  $("#modal-backdrop").hidden = false;
+  $("#entry-title").focus();
+}
 function toast(message) { const t = $("#toast"); t.textContent = message; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 3000); }
+function meetingDate(meeting) {
+  if (meeting.date) return new Date(`${meeting.date}T${meeting.time || "12:00"}`);
+  const month = new Date(`${meeting.month || ""} 1, ${calendarMonth.getFullYear()}`).getMonth();
+  return Number.isFinite(month) && meeting.day ? new Date(calendarMonth.getFullYear(), month, Number(meeting.day), 12) : null;
+}
+function renderCalendar() {
+  const year = calendarMonth.getFullYear();
+  const month = calendarMonth.getMonth();
+  $("#calendar-title").textContent = calendarMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  $("#calendar-month-label").textContent = "Scheduled meetings";
+  const meetings = (data.upcoming || []).filter((meeting) => meeting.status !== "completed").map((meeting) => ({ meeting, date: meetingDate(meeting) })).filter(({ date }) => date && date.getFullYear() === year && date.getMonth() === month);
+  meetings.sort((a, b) => a.date - b.date);
+  $("#calendar-list").innerHTML = meetings.map(({ meeting, date }) => {
+    const processName = meeting.processName || meeting.meta?.split("•").pop()?.trim() || "Process";
+    const time = meeting.time || meeting.meta?.split("•")[0]?.trim() || "Time to be confirmed";
+    return `<article class="calendar-meeting"><div class="calendar-date"><strong>${date.toLocaleDateString("en-US", { day: "numeric" })}</strong><span>${date.toLocaleDateString("en-US", { weekday: "short" })}</span></div><div class="calendar-meeting-details"><h3>${meeting.title}</h3><p>${time} · ${meeting.location || "Location to be confirmed"}</p><small>${processName}</small></div></article>`;
+  }).join("");
+  $("#calendar-empty").hidden = meetings.length > 0;
+}
+function openCalendar() {
+  calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  renderCalendar();
+  $("#calendar-backdrop").hidden = false;
+}
 function generateSummary() { toast("Your case summary is ready — 3 key threads found."); setTimeout(() => alert(`CASE SUMMARY — ${selected().name}\n\nThe process has ${selected().entries.length} recorded entries. Recent activity includes ${selected().entries[0]?.title || "no entries"}.\n\nNext suggested step: review the upcoming commitments and add any follow-up notes.`), 400); }
 function escapeCsv(value) {
   return `"${String(value ?? "").replace(/"/g, "\"\"")}"`;
@@ -313,8 +661,11 @@ function removeWorkspace(workspaceId) {
   }
   save(); render(); renderWorkspaces(); toast("Workspace removed.");
 }
-$("#new-entry").addEventListener("click", openModal); $("#add-meeting").addEventListener("click", openModal);
+$("#new-entry").addEventListener("click", openModal); $("#add-meeting").addEventListener("click", () => { $("#upcoming-menu").hidden = true; openModal(true); });
+$("#upcoming-menu-button").addEventListener("click", () => { const menu = $("#upcoming-menu"); menu.hidden = !menu.hidden; $("#upcoming-menu-button").setAttribute("aria-expanded", String(!menu.hidden)); });
 $("#timeline-menu-button").addEventListener("click", () => { const menu = $("#timeline-menu"); menu.hidden = !menu.hidden; $("#timeline-menu-button").setAttribute("aria-expanded", String(!menu.hidden)); });
+$("#sort-newest").addEventListener("click", () => { historySort = "newest"; $("#timeline-menu").hidden = true; render(); toast("History sorted newest first."); });
+$("#sort-oldest").addEventListener("click", () => { historySort = "oldest"; $("#timeline-menu").hidden = true; render(); toast("History sorted oldest first."); });
 document.querySelectorAll("[data-filter]").forEach((button) => button.addEventListener("click", () => { activeFilter = button.dataset.filter; showAllEntries = true; $("#timeline-menu").hidden = true; render(); toast(activeFilter === "all" ? "Showing all event types." : `Showing ${activeFilter}s only.`); }));
 $("#menu-search").addEventListener("click", () => { $("#timeline-menu").hidden = true; $("#search-popover").hidden = false; $("#event-search").focus(); });
 $("#export-events").addEventListener("click", exportAllEvents);
@@ -387,24 +738,101 @@ document.addEventListener("click", (event) => {
 $("#modal-close").addEventListener("click", closeModal); $("#cancel-entry").addEventListener("click", closeModal);
 $("#delete-entry").addEventListener("click", () => {
   if (editingIndex === null) return;
+  const removed = selected().entries[editingIndex];
   selected().entries.splice(editingIndex, 1);
+  removeJournalRecord(removed?.id);
   save(); render(); closeModal(); toast("Entry deleted.");
 });
 $("#modal-backdrop").addEventListener("click", (e) => { if (e.target.id === "modal-backdrop") closeModal(); });
 $("#entry-form").addEventListener("submit", async (e) => {
   e.preventDefault();
+  try {
   const file = $("#entry-recording").files[0];
+  if (!$("#entry-title").value.trim() || !$("#entry-date").value) {
+    toast("Add a title and date before saving.");
+    return;
+  }
   const existingEntry = editingIndex === null ? null : selected().entries[editingIndex];
   const date = new Date(`${$("#entry-date").value}T${$("#entry-time").value || "12:00"}`);
   const process = selected();
-  const recording = file ? { name: file.name, type: file.type, data: await readFileAsDataUrl(file) } : existingEntry?.recordingData;
+  let previousEntries = null;
+  let previousUpcoming = null;
+  const recording = file ? await storeRecording(file) : existingEntry?.recordingData;
   const hasRecording = Boolean(file) || Boolean(existingEntry?.recording || existingEntry?.recordingData);
-  const updatedEntry = { type: $("#entry-type").value, date: date.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }), title: $("#entry-title").value, description: $("#entry-notes").value || "Entry captured in Threadline.", tags: [$("#entry-type").value === "meeting" ? "Minutes added" : "Personal note", ...(hasRecording ? ["Recording"] : [])], recording: hasRecording, ...(recording ? { recordingData: recording } : {}) };
-  if (editingIndex === null) process.entries.unshift(updatedEntry);
-  else process.entries[editingIndex] = updatedEntry;
+  const location = $("#entry-location").value.trim();
+  let savedId = existingEntry?.id;
+  if (upcomingEditingIndex !== null) {
+    const meeting = data.upcoming[upcomingEditingIndex];
+    meeting.day = String(date.getDate()).padStart(2, "0");
+    meeting.month = date.toLocaleDateString("en-US", { month: "short" }).toUpperCase();
+    meeting.date = $("#entry-date").value;
+    meeting.time = $("#entry-time").value || "12:00";
+    meeting.title = $("#entry-title").value.trim();
+    meeting.meta = `${meeting.time} • ${process.name}`;
+    meeting.location = location;
+    meeting.description = $("#entry-notes").value.trim();
+    save();
+    verifyEntrySaved(meeting.id);
+    render(); closeModal(); toast("Upcoming meeting updated.");
+    return;
+  }
+  const updatedEntry = { type: $("#entry-type").value, date: date.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }), title: $("#entry-title").value, description: $("#entry-notes").value || "Entry captured in Threadline.", location, tags: [$("#entry-type").value === "meeting" ? "Minutes added" : "Personal note", ...(hasRecording ? ["Recording"] : [])], recording: hasRecording, ...(recording ? { recordingData: recording } : {}) };
+  updatedEntry.id = existingEntry?.id || createId("entry");
+  previousEntries = process.entries.slice();
+  previousUpcoming = data.upcoming.slice();
+  if (!addingUpcomingMeeting && editingIndex === null) process.entries.unshift(updatedEntry);
+  else if (!addingUpcomingMeeting) process.entries[editingIndex] = updatedEntry;
+  if (addingUpcomingMeeting) {
+    const meeting = {
+      id: createId("meeting"),
+      day: String(date.getDate()).padStart(2, "0"),
+      month: date.toLocaleDateString("en-US", { month: "short" }).toUpperCase(),
+      title: $("#entry-title").value.trim(),
+      meta: `${$("#entry-time").value || "12:00"} • ${process.name}`,
+      location,
+      date: $("#entry-date").value,
+      time: $("#entry-time").value || "12:00",
+      processId: process.id,
+      processName: process.name,
+      description: $("#entry-notes").value.trim()
+    };
+    data.upcoming.unshift(meeting);
+    savedId = meeting.id;
+  }
   const wasEditing = editingIndex !== null;
-  save(); render(); closeModal(); toast(wasEditing ? "Entry updated." : (file ? "Entry and recording saved." : "Entry saved to the timeline."));
+  save();
+  if (addingUpcomingMeeting && promoteDueMeetings()) save();
+  verifyEntrySaved(savedId);
+  render();
+  closeModal();
+  toast(wasEditing ? "Entry updated." : (file ? "Entry and recording saved." : "Entry saved to the timeline."));
+  } catch (error) {
+    console.error(error);
+    if (previousEntries) process.entries = previousEntries;
+    if (previousUpcoming) data.upcoming = previousUpcoming;
+    toast(`The entry could not be saved: ${error.message || "check browser storage and try again."}`);
+  }
 });
+$("#entry-recording").addEventListener("change", () => {
+  const file = $("#entry-recording").files[0];
+  if (!file) return;
+  $("#recording-label").textContent = file.name;
+  $("#recording-status").textContent = `${Math.ceil(file.size / 1024 / 1024)} MB recording selected`;
+});
+function storeRecording(file) {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open("threadline-recordings", 1);
+    request.onupgradeneeded = () => request.result.createObjectStore("recordings", { keyPath: "id" });
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const id = `recording-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const transaction = request.result.transaction("recordings", "readwrite");
+      transaction.objectStore("recordings").put({ id, name: file.name, type: file.type, size: file.size, blob: file });
+      transaction.oncomplete = () => resolve({ id, name: file.name, type: file.type, size: file.size });
+      transaction.onerror = () => reject(transaction.error);
+    };
+  });
+}
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -415,7 +843,11 @@ function readFileAsDataUrl(file) {
 }
 $("#history-summary").addEventListener("click", generateSummary); $("#generate-overview").addEventListener("click", generateSummary);
 $("#show-all").addEventListener("click", () => { showAllEntries = !showAllEntries; render(); });
-$("#open-calendar").addEventListener("click", () => toast("Calendar view is coming soon."));
+$("#open-calendar").addEventListener("click", openCalendar);
+$("#calendar-close").addEventListener("click", () => { $("#calendar-backdrop").hidden = true; });
+$("#calendar-previous").addEventListener("click", () => { calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1); renderCalendar(); });
+$("#calendar-next").addEventListener("click", () => { calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1); renderCalendar(); });
+$("#calendar-backdrop").addEventListener("click", (event) => { if (event.target.id === "calendar-backdrop") $("#calendar-backdrop").hidden = true; });
 $("#add-process").addEventListener("click", () => { const name = prompt("Name this process"); if (name?.trim()) { const id = `${Date.now()}`; data.processes.push({ id, name: name.trim(), color: "blue", started: "Sep 13, 2026", entries: [] }); selectedId = id; save(); render(); toast("New process created."); } });
 $("#settings-button").addEventListener("click", () => { renderAdminPeople(); renderDashboardSettings(); $("#settings-backdrop").hidden = false; });
 $("#edit-my-profile").addEventListener("click", () => { $("#settings-backdrop").hidden = true; openUserEditor(currentUser(), false); });
@@ -423,6 +855,16 @@ $("#settings-close").addEventListener("click", () => { $("#settings-backdrop").h
 $("#settings-backdrop").addEventListener("click", (event) => { if (event.target.id === "settings-backdrop") $("#settings-backdrop").hidden = true; });
 $("#settings-backup").addEventListener("click", () => { backupAllData(); });
 $("#settings-restore").addEventListener("click", () => { $("#settings-backdrop").hidden = true; $("#restore-file").click(); });
-addDemoEntries();
-addTestProcesses();
+promotedMeetings = promoteDueMeetings();
 render();
+readStructuredSnapshot().then((snapshot) => {
+  if (snapshot) mergeStoredRecords(snapshot);
+  ensureStableIds();
+  syncWorkspace();
+  promoteDueMeetings();
+  addDemoEntries();
+  addTestProcesses();
+  save();
+  render();
+}).catch((error) => console.warn("Unable to restore the structured Threadline snapshot.", error));
+setInterval(() => render(), 30000);
