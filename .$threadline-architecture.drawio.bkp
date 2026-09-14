@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" page="0" gridColor="#e0e0e0" background="#ffffff">
+  <root>
+    <mxCell id="0"/>
+    <mxCell id="1" parent="0"/>
+
+    <!-- Browser Runtime Container -->
+    <mxCell id="2" value="Browser Runtime" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=13;fontStyle=1;horizontal=1;swimlaneLine=1;" vertex="1" parent="1">
+      <mxGeometry x="40" y="40" width="960" height="640" as="geometry"/>
+    </mxCell>
+
+    <!-- UI Layer Label -->
+    <mxCell id="3" value="UI LAYER" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;fontStyle=1;fontSize=10;fontColor=#888888;" vertex="1" parent="2">
+      <mxGeometry x="20" y="50" width="120" height="20" as="geometry"/>
+    </mxCell>
+
+    <!-- index.html -->
+    <mxCell id="4" value="index.html - App Shell" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#000000;fontSize=11;fontStyle=1;" vertex="1" parent="2">
+      <mxGeometry x="20" y="80" width="180" height="50" as="geometry"/>
+    </mxCell>
+
+    <!-- styles.css -->
+    <mxCell id="5" value="styles.css - Styling" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#000000;fontSize=11;" vertex="1" parent="2">
+      <mxGeometry x="220" y="80" width="180" height="50" as="geometry"/>
+    </mxCell>
+
+    <!-- Logic Layer Label -->
+    <mxCell id="6" value="LOGIC LAYER  (app.js)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;fontStyle=1;fontSize=10;fontColor=#888888;" vertex="1" parent="2">
+      <mxGeometry x="20" y="170" width="180" height="20" as="geometry"/>
+    </mxCell>
+
+    <!-- State Manager -->
+    <mxCell id="7" value="State Manager" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#000000;fontSize=11;" vertex="1" parent="2">
+      <mxGeometry x="20" y="200" width="160" height="50" as="geometry"/>
+    </mxCell>
+
+    <!-- Render Engine -->
+    <mxCell id="8" value="Render Engine" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#000000;fontSize=11;" vertex="1" parent="2">
+      <mxGeometry x="200" y="200" width="160" height="50" as="geometry"/>
+    </mxCell>
+
+    <!-- Modal Controller -->
+    <mxCell id="9" value="Modal Controller" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#000000;fontSize=11;" vertex="1" parent="2">
+      <mxGeometry x="380" y="200" width="160" height="50" as="geometry"/>
+    </mxCell>
+
+    <!-- Process Manager -->
+    <mxCell id="10" value="Process Manager" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#000000;fontSize=11;" vertex="1" parent="2">
+      <mxGeometry x="560" y="200" width="160" height="50" as="geometry"/>
+    </mxCell>
+
+    <!-- User and Workspace Manager -->
+    <mxCell id="11" value="User and Workspace Manager" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#000000;fontSize=11;" vertex="1" parent="2">
+      <mxGeometry x="740" y="200" width="190" height="50" as="geometry"/>
+    </mxCell>
+
+    <!-- Calendar -->
+    <mxCell id="12" value="Calendar" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#000000;fontSize=11;" vertex="1" parent="2">
+      <mxGeometry x="20" y="310" width="160" height="50" as="geometry"/>
+    </mxCell>
+
+    <!-- Export Handler -->
+    <mxCell id="13" value="Export Handler - Excel + Backup" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#000000;fontSize=11;" vertex="1" parent="2">
+      <mxGeometry x="200" y="310" width="200" height="50" as="geometry"/>
+    </mxCell>
+
+    <!-- AI Summary -->
+    <mxCell id="14" value="AI Summary - generateSummary" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#000000;fontSize=11;" vertex="1" parent="2">
+      <mxGeometry x="420" y="310" width="210" height="50" as="geometry"/>
+    </mxCell>
+
+    <!-- Recording Handler -->
+    <mxCell id="15" value="Recording Handler" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#000000;fontSize=11;" vertex="1" parent="2">
+      <mxGeometry x="650" y="310" width="160" height="50" as="geometry"/>
+    </mxCell>
+
+    <!-- Storage Layer Label -->
+    <mxCell id="16" value="STORAGE LAYER" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;fontStyle=1;fontSize=10;fontColor=#888888;" vertex="1" parent="2">
+      <mxGeometry x="20" y="410" width="150" height="20" as="geometry"/>
+    </mxCell>
+
+    <!-- localStorage -->
+    <mxCell id="17" value="localStorage - JSON State" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#000000;fontSize=11;" vertex="1" parent="2">
+      <mxGeometry x="80" y="445" width="180" height="80" as="geometry"/>
+    </mxCell>
+
+    <!-- IndexedDB Snapshots -->
+    <mxCell id="18" value="IndexedDB - Structured Snapshots" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#000000;fontSize=11;" vertex="1" parent="2">
+      <mxGeometry x="330" y="445" width="200" height="80" as="geometry"/>
+    </mxCell>
+
+    <!-- IndexedDB Recordings -->
+    <mxCell id="19" value="IndexedDB - Recordings (Binary)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#000000;fontSize=11;" vertex="1" parent="2">
+      <mxGeometry x="600" y="445" width="200" height="80" as="geometry"/>
+    </mxCell>
+
+    <!-- View State (localStorage) -->
+    <mxCell id="20" value="View State - localStorage" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#000000;fontSize=11;" vertex="1" parent="2">
+      <mxGeometry x="820" y="445" width="110" height="80" as="geometry"/>
+    </mxCell>
+
+    <!-- EDGES -->
+
+    <!-- index.html loads app.js (State Manager) -->
+    <mxCell id="21" value="loads" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;fontColor=#555555;fontSize=10;" edge="1" parent="2" source="4" target="7">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- index.html links styles.css -->
+    <mxCell id="22" value="links" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;fontColor=#555555;fontSize=10;dashed=1;" edge="1" parent="2" source="4" target="5">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- State Manager drives Render Engine -->
+    <mxCell id="23" value="drives" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d6b656;fontColor=#555555;fontSize=10;" edge="1" parent="2" source="7" target="8">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- Render Engine updates DOM via index.html -->
+    <mxCell id="24" value="updates DOM" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d6b656;fontColor=#555555;fontSize=10;" edge="1" parent="2" source="8" target="4">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- Modal Controller triggers State Manager -->
+    <mxCell id="25" value="triggers" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d6b656;fontColor=#555555;fontSize=10;" edge="1" parent="2" source="9" target="7">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- Process Manager reads/writes State Manager -->
+    <mxCell id="26" value="reads/writes" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d6b656;fontColor=#555555;fontSize=10;" edge="1" parent="2" source="10" target="7">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- User Manager reads/writes State Manager -->
+    <mxCell id="27" value="reads/writes" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d6b656;fontColor=#555555;fontSize=10;" edge="1" parent="2" source="11" target="7">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- State Manager persists to localStorage -->
+    <mxCell id="28" value="persists" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;fontColor=#555555;fontSize=10;" edge="1" parent="2" source="7" target="17">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- State Manager persists to IndexedDB Snapshots -->
+    <mxCell id="29" value="snapshots" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;fontColor=#555555;fontSize=10;" edge="1" parent="2" source="7" target="18">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- Recording Handler writes to IndexedDB Recordings -->
+    <mxCell id="30" value="stores binary" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;fontColor=#555555;fontSize=10;" edge="1" parent="2" source="15" target="19">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- Render Engine persists View State -->
+    <mxCell id="31" value="saves view state" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;fontColor=#555555;fontSize=10;" edge="1" parent="2" source="8" target="20">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- Calendar reads Process Manager -->
+    <mxCell id="32" value="reads meetings" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d6b656;fontColor=#555555;fontSize=10;" edge="1" parent="2" source="12" target="10">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- Export reads State Manager -->
+    <mxCell id="33" value="reads all data" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d6b656;fontColor=#555555;fontSize=10;" edge="1" parent="2" source="13" target="7">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- AI Summary reads Process Manager -->
+    <mxCell id="34" value="reads entries" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9673a6;fontColor=#555555;fontSize=10;" edge="1" parent="2" source="14" target="10">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+  </root>
+</mxGraphModel>

@@ -9,9 +9,71 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css?v=20260913-1100" />
     <style>
+      /* ── Default (wide): sidebar + two-column dashboard ── */
       .dashboard-grid { grid-template-columns: 1fr; }
       .dashboard-grid > .right-column { order: 1; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
       .dashboard-grid > .timeline-panel { order: 2; }
+
+      /* ── Medium (900–1279px): narrow sidebar, stacked dashboard ── */
+      @media (max-width: 1279px) {
+        .sidebar { width: 210px; padding: 20px 10px 14px; }
+        .brand { font-size: 17px; padding: 0 10px 32px; }
+        .nav-item { padding: 9px 10px; font-size: 12px; }
+        .process-item { padding: 9px 6px 9px 10px; }
+        .main-content { min-width: 0; }
+        .content-wrap { padding: 20px 20px 40px; }
+        .metric-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .dashboard-grid > .right-column { grid-template-columns: 1fr; }
+        .dashboard-grid > .right-column > .upcoming-panel,
+        .dashboard-grid > .right-column > .insight-panel { height: auto; }
+      }
+
+      /* ── Small (≤768px): collapsible sidebar becomes a top bar ── */
+      @media (max-width: 768px) {
+        .app-shell { flex-direction: column; }
+        .sidebar {
+          width: 100%;
+          flex-direction: row;
+          align-items: center;
+          padding: 10px 14px;
+          border-right: none;
+          border-bottom: 1px solid #dfe7e3;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        .brand { padding: 0; font-size: 16px; }
+        .workspace-label { display: none; }
+        .primary-nav { flex-direction: row; grid-template-columns: none; display: flex; gap: 4px; flex: 1; }
+        .nav-item { padding: 7px 10px; font-size: 12px; }
+        .sidebar-section { display: none; }
+        .sidebar-bottom { margin-top: 0; margin-left: auto; display: flex; align-items: center; gap: 8px; }
+        .profile { padding: 4px 8px; }
+        .profile > div > strong,
+        .profile > div > small,
+        .profile .dots { display: none; }
+        .profile .avatar { width: 28px; height: 28px; font-size: 11px; }
+        .main-content { width: 100%; }
+        .content-wrap { padding: 16px 14px 32px; }
+        .topbar { padding: 12px 14px; }
+        .page-intro { flex-direction: column; align-items: flex-start; gap: 10px; }
+        .page-intro h1 { font-size: 24px; }
+        .metric-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+        .metric-card { padding: 14px; }
+        .dashboard-grid { gap: 14px; }
+        .dashboard-grid > .right-column { grid-template-columns: 1fr; order: 2; }
+        .dashboard-grid > .timeline-panel { order: 1; }
+        .dashboard-grid > .right-column > .upcoming-panel,
+        .dashboard-grid > .right-column > .insight-panel { height: auto; }
+        .panel { padding: 16px; }
+      }
+
+      /* ── Extra small (≤480px): single column metric grid ── */
+      @media (max-width: 480px) {
+        .metric-grid { grid-template-columns: 1fr; }
+        .page-intro h1 { font-size: 20px; }
+        .topbar { flex-wrap: wrap; gap: 8px; }
+      }
+
       @media (max-width: 650px) {
         .dashboard-grid > .right-column { grid-template-columns: 1fr; }
       }
@@ -141,6 +203,6 @@
     <div class="toast" id="toast" role="status"></div>
     <div class="search-popover" id="search-popover" hidden><label for="event-search">Search this process</label><div><input id="event-search" type="search" placeholder="Search titles and summaries…" /><button id="clear-search" aria-label="Clear search">×</button></div></div>
     <input id="restore-file" type="file" accept="application/json,.json" hidden />
-    <script src="app.js?v=20260913-1330"></script>
+    <script type="module" src="app.js"></script>
   </body>
 </html>
