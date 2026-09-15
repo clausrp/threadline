@@ -95,7 +95,7 @@
         </div>
         <div class="sidebar-bottom">
           <button class="nav-item" id="settings-button"><span>⚙</span> Settings</button>
-          <button class="profile" id="workspace-switcher"><div class="avatar">AM</div><div><strong>Alex Morgan</strong><small id="workspace-label">Personal workspace</small></div><span class="dots">•••</span></button>
+          <button class="profile" id="workspace-switcher"><div class="avatar" id="user-avatar">CR</div><div><strong id="user-name">Claus Ramstedt Petersen</strong><small id="workspace-label">Claus's workspace</small></div><span class="dots">•••</span></button>
         </div>
       </aside>
 
@@ -107,7 +107,7 @@
 
         <section class="content-wrap">
           <div class="page-intro">
-            <div><p class="eyebrow">SUNDAY, SEPTEMBER 13, 2026</p><h1 id="page-title">Good morning, Alex <span>✦</span></h1><p class="lede">Keep every thread of your cases in one clear place.</p></div>
+            <div><p class="eyebrow" id="page-date"></p><h1 id="page-title">Good morning <span>✦</span></h1><p class="lede">Keep every thread of your cases in one clear place.</p></div>
             <button class="button button-outline" id="generate-overview">✦ Generate overview</button>
           </div>
 
@@ -167,8 +167,7 @@
           <div class="settings-card" id="backup-settings-card"><div><strong>Backup all processes</strong><p>Download one compressed archive containing every process, event, summary, meeting, and stored recording.</p></div><button class="button button-dark" id="settings-backup">Download backup</button></div>
           <div class="settings-card" id="restore-settings-card"><div><strong>Restore all processes</strong><p>Load a complete Threadline backup. It replaces every process currently stored in this browser.</p></div><button class="button button-outline" id="settings-restore">Choose backup</button></div>
           <div class="settings-section"><p class="eyebrow">DESKTOP</p><p class="settings-section-copy">Choose which objects appear on this workspace dashboard.</p><div class="dashboard-options"><label><input type="checkbox" data-dashboard-setting="process" /> Process timeline</label><label><input type="checkbox" data-dashboard-setting="upcoming" /> Coming up</label><label><input type="checkbox" data-dashboard-setting="insight" /> Threadline Insight</label></div></div>
-          <div class="settings-section"><p class="eyebrow">YOUR PROFILE</p><p class="settings-section-copy">Update your name and email address.</p><button class="button button-outline" id="edit-my-profile">Edit my information</button></div>
-          <div class="settings-section" id="admin-user-settings"><p class="eyebrow">USERS</p><p class="settings-section-copy">Each user has one separate workspace. Add, edit, or remove users here; share individual processes from the process menu.</p><div id="admin-people-list" class="people-list"></div><div class="workspace-create"><input id="admin-person-name" placeholder="Person name" /><input id="admin-person-email" placeholder="Email" /><label class="checkbox-label create-admin-label"><input id="admin-person-admin" type="checkbox" /> Admin</label><button class="button button-outline" id="admin-add-person">+ Add user</button></div></div>
+          <div class="settings-section"><p class="eyebrow">YOUR ACCOUNT</p><p class="settings-section-copy">Update your name and email address.</p><button class="button button-outline" id="edit-my-profile">Edit my information</button></div>
           <p class="settings-footnote">Your data is stored locally in this browser. Keep the backup file somewhere safe.</p>
       </div>
     </div>

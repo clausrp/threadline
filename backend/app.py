@@ -4,6 +4,7 @@ Serves the frontend and provides the REST API for all data and AI operations.
 """
 
 import json
+import os
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -813,14 +814,51 @@ if FRONTEND_DIR.exists():
 # ── Entry point ────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    import webbrowser
+    import shutil
+    import socket
+    import subprocess
     import threading
+    import time
+    import webbrowser
     import uvicorn
 
-    def open_browser():
-        import time
-        time.sleep(1.2)
-        webbrowser.open("http://127.0.0.1:8000")
+    def find_free_port(preferred: int) -> int:
+        """Return preferred port if free, otherwise find the next available one."""
+        for port in range(preferred, preferred + 20):
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                if s.connect_ex(("127.0.0.1", port)) != 0:
+                    return port
+        raise RuntimeError("No free port found in range.")
 
+    def ensure_ollama():
+        """Start Ollama serve if it is installed but not already running."""
+        if not shutil.which("ollama"):
+            return
+        try:
+            import urllib.request
+            urllib.request.urlopen("http://127.0.0.1:11434/api/tags", timeout=2)
+            print("✓  Ollama already running")
+        except Exception:
+            print("→  Starting Ollama...")
+            subprocess.Popen(
+                ["ollama", "serve"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            time.sleep(2)
+            print("✓  Ollama started")
+
+    preferred_port = int(os.getenv("PORT", "8000"))
+    port = find_free_port(preferred_port)
+    if port != preferred_port:
+        print(f"⚠️   Port {preferred_port} in use — using port {port} instead")
+    url = f"http://127.0.0.1:{port}"
+
+    def open_browser():
+        time.sleep(1.2)
+        webbrowser.open(url)
+
+    ensure_ollama()
+    print(f"→  Opening {url}")
     threading.Thread(target=open_browser, daemon=True).start()
-    uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=False)
+    uvicorn.run("app:app", host="127.0.0.1", port=port, reload=False)

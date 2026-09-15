@@ -160,11 +160,11 @@ def seed_database(db: Session):
     if db.query(User).count() > 0:
         return
 
-    admin = User(id="user-admin", name="Me", email="me@example.com", role="admin")
+    admin = User(id="user-admin", name="Claus Ramstedt Petersen", email="claus.ramstedt@gmail.com", role="admin")
     db.add(admin)
     db.flush()
 
-    workspace = Workspace(id="ws-personal", name="Personal workspace", owner_id=admin.id)
+    workspace = Workspace(id="ws-personal", name="Claus's workspace", owner_id=admin.id)
     db.add(workspace)
     db.flush()
 

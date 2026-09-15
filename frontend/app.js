@@ -78,16 +78,24 @@ const saveViewState = () => localStorage.setItem("threadline-view", JSON.stringi
 
 // ── Render ────────────────────────────────────────────────────────────────────
 
+const isOverview = () => selectedId === null;
+
 function render() {
-  const process = selected();
+  const overview = isOverview();
+  const process = overview ? null : selected();
   const dashboard = { ...dashboardDefaults, ...(activeWorkspace()?.dashboard || {}) };
 
   document.querySelectorAll("[data-dashboard-object]").forEach((el) => {
     el.hidden = !dashboard[el.dataset.dashboardObject];
   });
 
+  // Sidebar nav — highlight Overview when no process selected
+  document.querySelectorAll(".primary-nav .nav-item").forEach((b) => {
+    b.classList.toggle("active", b.dataset.view === "overview" && overview);
+  });
+
   $("#process-list").innerHTML = data.processes.map((p) => `
-    <div class="process-row ${p.id === selectedId ? "active" : ""}">
+    <div class="process-row ${!overview && p.id === selectedId ? "active" : ""}">
       <button class="process-item" data-process="${p.id}">
         <i class="process-dot" style="background:${p.color === "orange" ? "#ed9a72" : p.color === "green" ? "#93be9e" : "#7eb0bd"}"></i>
         <span>${p.name}</span>
@@ -102,10 +110,19 @@ function render() {
   $("#workspace-label").textContent = activeWorkspace()?.name || "Personal workspace";
   $("#process-count").textContent = data.processes.length;
   $("#active-count").textContent = data.processes.length;
-  $("#selected-title").textContent = process.name;
-  $("#breadcrumb-title").textContent = process.name;
 
-  const matchingEntries = (process.entries || [])
+  // ── History panel ─────────────────────────────────────────────────────────
+
+  const historyTitle = overview ? "All processes" : process.name;
+  $("#selected-title").textContent = historyTitle;
+  $("#breadcrumb-title").textContent = overview ? "Overview" : process.name;
+
+  // In overview: merge all entries; in process mode: single process entries
+  const sourceEntries = overview
+    ? data.processes.flatMap((p) => (p.entries || []).map((e) => ({ ...e, _processName: p.name })))
+    : (process.entries || []);
+
+  const matchingEntries = sourceEntries
     .filter((e) => activeFilter === "all" || e.type === activeFilter)
     .filter((e) => !searchTerm || `${e.title} ${e.description} ${e.date}`.toLowerCase().includes(searchTerm.toLowerCase()))
     .sort((a, b) => {
@@ -114,12 +131,12 @@ function render() {
     });
 
   const visibleEntries = showAllEntries || activeFilter !== "all" || searchTerm
-    ? matchingEntries : matchingEntries.slice(0, 4);
+    ? matchingEntries : matchingEntries.slice(0, 5);
 
   $("#timeline").innerHTML = visibleEntries.length
     ? visibleEntries.map((e) => `
         <article class="timeline-entry ${e.type}" data-entry-id="${e.id}" title="Edit entry">
-          <div class="entry-date">${e.date}</div>
+          <div class="entry-date">${e.date}${overview && e._processName ? ` <span class="entry-process-tag">${e._processName}</span>` : ""}</div>
           <div class="entry-title">${e.title}</div>
           <div class="entry-description">${e.description || ""}</div>
           <div class="entry-tags">
@@ -127,33 +144,42 @@ function render() {
             ${e.aiSummary ? `<span class="tag ai-tag">✦ Summary</span>` : ""}
           </div>
         </article>`).join("")
-    : `<p class="empty-results">No matching events found.</p>`;
+    : `<p class="empty-results">No entries yet.</p>`;
 
   $("#show-all").hidden = Boolean(searchTerm || activeFilter !== "all");
   $("#show-all").innerHTML = showAllEntries
     ? "Show fewer entries <span>↑</span>"
-    : `View all ${(process.entries || []).length} entries <span>→</span>`;
+    : `View all ${matchingEntries.length} entries <span>→</span>`;
 
-  const activeUpcoming = (data.upcoming || []).filter((m) => m.status !== "completed");
-  const sortedUpcoming = [...activeUpcoming].sort((a, b) => {
+  // ── Upcoming panel ────────────────────────────────────────────────────────
+
+  const allUpcoming = (data.upcoming || []).filter((m) => m.status !== "completed");
+  // In process mode: only show upcoming for this process
+  const visibleUpcoming = overview
+    ? allUpcoming
+    : allUpcoming.filter((m) => m.processId === process?.id || m.processName === process?.name);
+
+  const sortedUpcoming = [...visibleUpcoming].sort((a, b) => {
     const aDate = a.date ? new Date(`${a.date}T${a.time || "23:59"}`).getTime() : Number.MAX_SAFE_INTEGER;
     const bDate = b.date ? new Date(`${b.date}T${b.time || "23:59"}`).getTime() : Number.MAX_SAFE_INTEGER;
     return aDate - bDate;
   });
 
-  $("#upcoming-list").innerHTML = sortedUpcoming.map((m) => `
-    <div class="upcoming-item" data-upcoming-id="${m.id}" title="Edit upcoming meeting">
-      <div class="date-block"><strong>${m.day}</strong><small>${m.month}</small></div>
-      <div>
-        <h4>${m.title}</h4><p>${m.meta}</p>
-        <p class="upcoming-location">⌖ ${m.location || "To be confirmed"}</p>
-      </div>
-    </div>`).join("");
+  $("#upcoming-list").innerHTML = sortedUpcoming.length
+    ? sortedUpcoming.map((m) => `
+        <div class="upcoming-item" data-upcoming-id="${m.id}" title="Edit upcoming meeting">
+          <div class="date-block"><strong>${m.day}</strong><small>${m.month}</small></div>
+          <div>
+            <h4>${m.title}</h4><p>${m.meta}</p>
+            <p class="upcoming-location">⌖ ${m.location || "To be confirmed"}</p>
+          </div>
+        </div>`).join("")
+    : `<p class="empty-results" style="padding:12px 0;font-size:12px;color:#9aaba6">No upcoming meetings.</p>`;
 
   document.querySelectorAll("[data-upcoming-id]").forEach((el) =>
     el.addEventListener("click", () => openUpcomingEdit(el.dataset.upcomingId)));
 
-  $("#meeting-count").textContent = activeUpcoming.length;
+  $("#meeting-count").textContent = allUpcoming.length;
   $("#notes-count").textContent = (data.processes || []).reduce((n, p) => n + (p.entries || []).length, 0);
 
   document.querySelectorAll("[data-process]").forEach((b) =>
@@ -169,6 +195,32 @@ function render() {
     b.addEventListener("click", () => openShareModal(b.dataset.shareProcess)));
   document.querySelectorAll("[data-entry-id]").forEach((el) =>
     el.addEventListener("click", () => openEditModal(el.dataset.entryId)));
+
+  // ── User / greeting ──────────────────────────────────────────────────────
+  const user = currentUser();
+  if (user) {
+    const initials = user.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+    const avatarEl = document.getElementById("user-avatar");
+    const nameEl   = document.getElementById("user-name");
+    if (avatarEl) avatarEl.textContent = initials;
+    if (nameEl)   nameEl.textContent   = user.name;
+  }
+
+  const dateEl = document.getElementById("page-date");
+  if (dateEl) {
+    const now  = new Date();
+    const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+    const mons = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+    dateEl.textContent = `${days[now.getDay()]}, ${mons[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`.toUpperCase();
+  }
+
+  const titleEl = document.getElementById("page-title");
+  if (titleEl) {
+    const hour = new Date().getHours();
+    const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+    const firstName = currentUser()?.name?.split(" ")[0] || "";
+    titleEl.innerHTML = `${greeting}, ${firstName} <span>✦</span>`;
+  }
 
   saveViewState();
 }
@@ -493,35 +545,24 @@ function renderWorkspaces() {
 function renderAdminPeople() {
   $("#backup-settings-card").hidden = !isAdmin();
   $("#restore-settings-card").hidden = !isAdmin();
-  $("#admin-user-settings").hidden = !isAdmin();
   const dashboard = { ...dashboardDefaults, ...(activeWorkspace()?.dashboard || {}) };
   document.querySelectorAll("[data-dashboard-setting]").forEach((input) => { input.checked = dashboard[input.dataset.dashboardSetting]; });
-  $("#admin-people-list").innerHTML = [...data.users]
-    .sort((a, b) => Number(b.role === "admin") - Number(a.role === "admin"))
-    .map((u) => `<div class="person-row"><span><strong>${u.name}</strong><small>${u.email} · ${u.role === "admin" ? "Admin" : "User"}</small></span>${u.id !== currentUser()?.id ? `<span><button data-edit-person="${u.id}">Edit</button><button data-admin-remove-person="${u.id}">Remove</button></span>` : `<small>Admin</small>`}</div>`)
-    .join("");
-  document.querySelectorAll("[data-edit-person]").forEach((b) => b.addEventListener("click", () => {
-    const user = data.users.find((u) => u.id === b.dataset.editPerson);
-    if (user) openUserEditor(user, true);
-  }));
-  document.querySelectorAll("[data-admin-remove-person]").forEach((b) => b.addEventListener("click", async () => {
-    await API.delete(`/api/users/${b.dataset.adminRemovePerson}`);
-    await reloadState();
-    renderAdminPeople();
-    toast("User removed.");
-  }));
 }
 
 function renderDashboardSettings() {
-  const dashboard = { ...dashboardDefaults, ...(activeWorkspace()?.dashboard || {}) };
   document.querySelectorAll("[data-dashboard-setting]").forEach((input) => {
-    input.checked = dashboard[input.dataset.dashboardSetting];
+    const ws = activeWorkspace();
+    const dashboard = { ...dashboardDefaults, ...(ws?.dashboard || {}) };
+    input.checked = Boolean(dashboard[input.dataset.dashboardSetting]);
     input.onchange = async () => {
       const ws = activeWorkspace();
-      const updated = { ...dashboard, [input.dataset.dashboardSetting]: input.checked };
-      await API.patch(`/api/workspaces/${ws.id}/dashboard`, updated);
+      const key = input.dataset.dashboardSetting;
+      const newValue = input.checked;
+      const current = { ...dashboardDefaults, ...(ws?.dashboard || {}) };
+      const updated = { ...current, [key]: newValue };
       ws.dashboard = updated;
       render();
+      await API.patch(`/api/workspaces/${ws.id}/dashboard`, updated);
     };
   });
 }
@@ -553,10 +594,17 @@ async function switchWorkspace(workspaceId) {
 async function reloadState() {
   const state = await API.get("/api/state");
   data = state;
-  selectedId = data.processes.some((p) => p.id === selectedId) ? selectedId : data.processes[0]?.id;
+  // Keep selectedId if process still exists; keep null (overview) if it was null
+  if (selectedId !== null) {
+    selectedId = data.processes.some((p) => p.id === selectedId) ? selectedId : null;
+  }
 }
 
 // ── Event listeners ───────────────────────────────────────────────────────────
+
+// Overview nav button → clear selection → overview mode
+document.querySelectorAll(".primary-nav [data-view='overview']").forEach((b) =>
+  b.addEventListener("click", () => { selectedId = null; showAllEntries = false; activeFilter = "all"; searchTerm = ""; render(); }));
 
 $("#new-entry").addEventListener("click", () => openModal(false));
 $("#add-meeting").addEventListener("click", () => { $("#upcoming-menu").hidden = true; openModal(true); });
@@ -581,17 +629,6 @@ $("#save-share").addEventListener("click", async () => {
 $("#workspace-switcher").addEventListener("click", () => { renderWorkspaces(); $("#workspace-backdrop").hidden = false; });
 $("#workspace-close").addEventListener("click", () => { $("#workspace-backdrop").hidden = true; });
 $("#workspace-backdrop").addEventListener("click", (e) => { if (e.target.id === "workspace-backdrop") $("#workspace-backdrop").hidden = true; });
-$("#admin-add-person").addEventListener("click", async () => {
-  const name = $("#admin-person-name").value.trim();
-  const email = $("#admin-person-email").value.trim();
-  if (!name || !email) return;
-  const role = $("#admin-person-admin").checked ? "admin" : "user";
-  const user = await API.post("/api/users", { name, email, role });
-  data.users.push(user);
-  $("#admin-person-name").value = ""; $("#admin-person-email").value = ""; $("#admin-person-admin").checked = false;
-  renderAdminPeople();
-  toast(`${name} added.`);
-});
 $("#edit-user-close").addEventListener("click", () => { $("#edit-user-backdrop").hidden = true; editingUserId = null; });
 $("#cancel-edit-user").addEventListener("click", () => { $("#edit-user-backdrop").hidden = true; editingUserId = null; });
 $("#save-edit-user").addEventListener("click", async () => {
@@ -759,9 +796,12 @@ async function init() {
   try {
     const state = await API.get("/api/state");
     data = state;
-    selectedId = data.processes.some((p) => p.id === viewState.selectedId)
-      ? viewState.selectedId
-      : data.processes[0]?.id;
+    // null = overview mode; restore last selected process if it still exists
+    selectedId = viewState.selectedId === null
+      ? null
+      : data.processes.some((p) => p.id === viewState.selectedId)
+        ? viewState.selectedId
+        : null;  // default to overview on first load
     showAllEntries = Boolean(viewState.showAllEntries);
     activeFilter = viewState.activeFilter || "all";
     searchTerm = viewState.searchTerm || "";
