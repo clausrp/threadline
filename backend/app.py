@@ -501,7 +501,10 @@ def delete_upcoming(upcoming_id: str, db: Session = Depends(get_db)):
 
 def _promote_due_meetings(db: Session) -> list[str]:
     """Move past upcoming meetings into process history. Returns list of promoted IDs."""
-    now = datetime.now(timezone.utc)
+    # Use local wall-clock time — meeting dates are stored as entered by the user
+    # (no timezone info), so comparing against UTC would give wrong results for
+    # users outside the UTC timezone.
+    now = datetime.now()
     promoted = []
     meetings = db.query(Upcoming).filter(Upcoming.status == "pending").all()
     for u in meetings:
@@ -509,7 +512,7 @@ def _promote_due_meetings(db: Session) -> list[str]:
             continue
         try:
             dt_str = f"{u.meeting_date}T{u.meeting_time or '23:59'}"
-            dt = datetime.fromisoformat(dt_str).replace(tzinfo=timezone.utc)
+            dt = datetime.fromisoformat(dt_str)  # naive — local time, same as `now`
         except Exception:
             continue
         if dt > now:
