@@ -47,6 +47,19 @@ const API = {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+// Convert "YYYY-MM-DD" → "DD/MM/YYYY" for display in the date input
+function isoToDMY(iso) {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+// Convert "DD/MM/YYYY" → "YYYY-MM-DD" for sending to the backend
+function dmyToIso(dmy) {
+  if (!dmy) return "";
+  const [d, m, y] = dmy.split("/");
+  return `${y}-${m}-${d}`;
+}
 const $ = (s) => document.querySelector(s);
 
 // ── App state ─────────────────────────────────────────────────────────────────
@@ -229,7 +242,7 @@ function render() {
 
 function resetEntryForm() {
   $("#entry-type").value = "meeting";
-  $("#entry-date").value = new Date().toISOString().slice(0, 10);
+  $("#entry-date").value = isoToDMY(new Date().toISOString().slice(0, 10));
   $("#entry-time").value = "10:00";
   $("#entry-title").value = "";
   $("#entry-location").value = "";
@@ -266,7 +279,7 @@ function openEditModal(entryId) {
   $("#entry-form").querySelector("[type=submit]").textContent = "Update";
   $("#delete-entry").hidden = false;
   $("#entry-type").value = entry.type || "meeting";
-  $("#entry-date").value = entry.isoDate || "";
+  $("#entry-date").value = isoToDMY(entry.isoDate || "");
   $("#entry-time").value = entry.time || "";
   $("#entry-title").value = entry.title || "";
   $("#entry-location").value = entry.location || "";
@@ -295,7 +308,7 @@ function openUpcomingEdit(upcomingId) {
   $("#entry-form").querySelector("[type=submit]").textContent = "Update";
   $("#delete-entry").hidden = false;
   $("#entry-type").value = "meeting";
-  $("#entry-date").value = meeting.date || "";
+  $("#entry-date").value = isoToDMY(meeting.date || "");
   $("#entry-time").value = meeting.time || "10:00";
   $("#entry-title").value = meeting.title || "";
   $("#entry-location").value = meeting.location || "";
@@ -689,7 +702,8 @@ $("#entry-form").addEventListener("submit", async (e) => {
   if (!$("#entry-title").value.trim() || !$("#entry-date").value) { toast("Add a title and date before saving."); return; }
   const process = selected();
   const file = $("#entry-recording")?.files[0];
-  const dateStr = $("#entry-date").value;
+  const dateStr = dmyToIso($("#entry-date").value);
+  if (!dateStr || dateStr.length !== 10) { toast("Enter date as DD/MM/YYYY."); return; }
   const timeStr = $("#entry-time").value || "12:00";
   const title = $("#entry-title").value.trim();
   const location = $("#entry-location").value.trim();

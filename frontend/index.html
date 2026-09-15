@@ -141,7 +141,7 @@
         <form id="entry-form">
           <label>Entry type<select id="entry-type"><option value="meeting">Meeting</option><option value="note">Note</option><option value="milestone">Milestone</option></select></label>
           <label>Title<input id="entry-title" required placeholder="e.g. Follow-up with Dr. Chen" /></label>
-          <div class="form-row"><label>Date<input id="entry-date" type="date" required /></label><label>Time<input id="entry-time" type="time" value="10:00" /></label></div>
+          <div class="form-row"><label>Date<input id="entry-date" type="text" placeholder="DD/MM/YYYY" pattern="\d{2}/\d{2}/\d{4}" required /></label><label>Time<input id="entry-time" type="time" value="10:00" /></label></div>
           <label>Location<input id="entry-location" placeholder="e.g. St Mary's Hospital, room 4" /></label>
           <label>Minutes / notes<textarea id="entry-notes" rows="4" placeholder="What was discussed? Add decisions, questions, or next steps…"></textarea></label>
           <label>Recording <div class="upload-box"><input id="entry-recording" type="file" accept="audio/*,video/*" /><span>⌁</span><span><strong id="recording-label">Attach a recording</strong><small id="recording-status">Audio or video; stored on this device</small></span></div></label>
