@@ -1,0 +1,18 @@
+# Threadline — Python dependencies
+# Install with: pip install -r requirements.txt
+
+# Web framework
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+
+# Database
+sqlalchemy==2.0.36
+
+# AI — transcription
+faster-whisper==1.1.0
+
+# AI — Ollama client (uses built-in urllib, no extra package needed)
+# Ollama itself must be installed separately: https://ollama.com
+
+# Utilities
+python-multipart==0.0.20

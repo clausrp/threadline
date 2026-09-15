@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Threadline — Process tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      /* ── Default (wide): sidebar + two-column dashboard ── */
+      .dashboard-grid { grid-template-columns: 1fr; }
+      .dashboard-grid > .right-column { order: 1; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+      .dashboard-grid > .timeline-panel { order: 2; }
+
+      /* ── Medium (900–1279px): narrow sidebar, stacked dashboard ── */
+      @media (max-width: 1279px) {
+        .sidebar { width: 210px; padding: 20px 10px 14px; }
+        .brand { font-size: 17px; padding: 0 10px 32px; }
+        .nav-item { padding: 9px 10px; font-size: 12px; }
+        .process-item { padding: 9px 6px 9px 10px; }
+        .main-content { min-width: 0; }
+        .content-wrap { padding: 20px 20px 40px; }
+        .metric-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .dashboard-grid > .right-column { grid-template-columns: 1fr; }
+        .dashboard-grid > .right-column > .upcoming-panel,
+        .dashboard-grid > .right-column > .insight-panel { height: auto; }
+      }
+
+      /* ── Small (≤768px): collapsible sidebar becomes a top bar ── */
+      @media (max-width: 768px) {
+        .app-shell { flex-direction: column; }
+        .sidebar {
+          width: 100%;
+          flex-direction: row;
+          align-items: center;
+          padding: 10px 14px;
+          border-right: none;
+          border-bottom: 1px solid #dfe7e3;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        .brand { padding: 0; font-size: 16px; }
+        .workspace-label { display: none; }
+        .primary-nav { flex-direction: row; grid-template-columns: none; display: flex; gap: 4px; flex: 1; }
+        .nav-item { padding: 7px 10px; font-size: 12px; }
+        .sidebar-section { display: none; }
+        .sidebar-bottom { margin-top: 0; margin-left: auto; display: flex; align-items: center; gap: 8px; }
+        .profile { padding: 4px 8px; }
+        .profile > div > strong,
+        .profile > div > small,
+        .profile .dots { display: none; }
+        .profile .avatar { width: 28px; height: 28px; font-size: 11px; }
+        .main-content { width: 100%; }
+        .content-wrap { padding: 16px 14px 32px; }
+        .topbar { padding: 12px 14px; }
+        .page-intro { flex-direction: column; align-items: flex-start; gap: 10px; }
+        .page-intro h1 { font-size: 24px; }
+        .metric-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+        .metric-card { padding: 14px; }
+        .dashboard-grid { gap: 14px; }
+        .dashboard-grid > .right-column { grid-template-columns: 1fr; order: 2; }
+        .dashboard-grid > .timeline-panel { order: 1; }
+        .dashboard-grid > .right-column > .upcoming-panel,
+        .dashboard-grid > .right-column > .insight-panel { height: auto; }
+        .panel { padding: 16px; }
+      }
+
+      /* ── Extra small (≤480px): single column metric grid ── */
+      @media (max-width: 480px) {
+        .metric-grid { grid-template-columns: 1fr; }
+        .page-intro h1 { font-size: 20px; }
+        .topbar { flex-wrap: wrap; gap: 8px; }
+      }
+
+      @media (max-width: 650px) {
+        .dashboard-grid > .right-column { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand"><span class="brand-mark">✦</span><span>threadline</span></div>
+        <div class="workspace-label">YOUR WORKSPACE</div>
+        <nav class="primary-nav" aria-label="Main navigation">
+          <button class="nav-item active" data-view="overview"><span>◫</span> Overview</button>
+          <button class="nav-item" data-view="all-processes"><span>◉</span> All processes <b id="process-count">3</b></button>
+          <button class="nav-item" data-view="upcoming"><span>◷</span> Upcoming</button>
+        </nav>
+        <div class="sidebar-section">
+          <div class="section-heading"><span>PROCESSES</span><button class="tiny-add" id="add-process" aria-label="Add process">+</button></div>
+          <div id="process-list" class="process-list"></div>
+        </div>
+        <div class="sidebar-bottom">
+          <button class="nav-item" id="settings-button"><span>⚙</span> Settings</button>
+          <button class="profile" id="workspace-switcher"><div class="avatar">AM</div><div><strong>Alex Morgan</strong><small id="workspace-label">Personal workspace</small></div><span class="dots">•••</span></button>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div class="breadcrumbs"><span>Workspace</span><b>/</b><strong id="breadcrumb-title">Overview</strong></div>
+          <div class="top-actions"><button class="icon-button" title="Search">⌕</button><button class="icon-button notification" title="Notifications">♧<i></i></button><button class="button button-dark" id="new-entry">+ New entry</button></div>
+        </header>
+
+        <section class="content-wrap">
+          <div class="page-intro">
+            <div><p class="eyebrow">SUNDAY, SEPTEMBER 13, 2026</p><h1 id="page-title">Good morning, Alex <span>✦</span></h1><p class="lede">Keep every thread of your cases in one clear place.</p></div>
+            <button class="button button-outline" id="generate-overview">✦ Generate overview</button>
+          </div>
+
+          <div class="metric-grid">
+            <article class="metric-card"><div class="metric-icon blue">◉</div><div><span>Active processes</span><strong id="active-count">3</strong><small><em>↑ 1</em> from last month</small></div></article>
+            <article class="metric-card"><div class="metric-icon peach">◷</div><div><span>Upcoming meetings</span><strong id="meeting-count">2</strong><small>Next one in <em>2 days</em></small></div></article>
+            <article class="metric-card"><div class="metric-icon green">✓</div><div><span>Notes captured</span><strong id="notes-count">18</strong><small><em>↑ 24%</em> this month</small></div></article>
+          </div>
+
+          <div class="dashboard-grid">
+            <section class="panel timeline-panel dashboard-object" data-dashboard-object="process">
+              <div class="panel-header"><div><h2>History</h2><p class="history-process" id="selected-title">Mum's health journey</p></div><div class="timeline-actions"><button class="more-button" id="timeline-menu-button" aria-label="Timeline options" aria-expanded="false">•••</button><div class="timeline-menu" id="timeline-menu" hidden><button id="menu-search">⌕ Search events</button><button data-filter="all">◫ Show all types</button><button data-filter="meeting">◷ Meetings only</button><button data-filter="note">▤ Notes only</button><button data-filter="milestone">✓ Milestones only</button><button id="sort-newest">↓ Newest first</button><button id="sort-oldest">↑ Oldest first</button><button id="export-events">⇩ Export this process to Excel</button></div></div></div>
+              <div class="process-meta"><span class="status-pill"><i></i> Active</span><span>Started Aug 12, 2026</span><span>•</span><span>12 entries</span></div>
+              <div class="timeline" id="timeline"></div>
+              <button class="text-button" id="show-all">View all entries <span>→</span></button>
+            </section>
+
+            <aside class="right-column">
+              <section class="panel upcoming-panel dashboard-object" data-dashboard-object="upcoming"><div class="panel-header"><h2>Coming up</h2><div class="timeline-actions"><button class="more-button" id="upcoming-menu-button" aria-label="Coming up options" aria-expanded="false">•••</button><div class="timeline-menu" id="upcoming-menu" hidden><button id="add-meeting">+ Add meeting</button></div></div></div><div id="upcoming-list"></div><button class="text-button upcoming-calendar-link" id="open-calendar">View calendar <span>→</span></button></section>
+              <section class="panel insight-panel dashboard-object" data-dashboard-object="insight"><div class="insight-top"><span class="sparkle">✦</span><span class="eyebrow">THREADLINE INSIGHT</span></div><h3>Make sense of the full story</h3><p>Generate a clear summary of everything that has happened so far, ready to share with your care team.</p><button class="button button-dark full-width" id="history-summary">Generate case summary <span>✦</span></button><div class="privacy-note">⌁ Your information stays on this device</div></section>
+            </aside>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="modal-backdrop" id="modal-backdrop" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <button class="modal-close" id="modal-close">×</button>
+        <p class="eyebrow" id="modal-eyebrow">NEW TIMELINE ENTRY</p><h2 id="modal-title">Add a meeting</h2><p class="modal-subtitle">Capture the details while they’re fresh.</p>
+        <form id="entry-form">
+          <label>Entry type<select id="entry-type"><option value="meeting">Meeting</option><option value="note">Note</option><option value="milestone">Milestone</option></select></label>
+          <label>Title<input id="entry-title" required placeholder="e.g. Follow-up with Dr. Chen" /></label>
+          <div class="form-row"><label>Date<input id="entry-date" type="date" required /></label><label>Time<input id="entry-time" type="time" value="10:00" /></label></div>
+          <label>Location<input id="entry-location" placeholder="e.g. St Mary's Hospital, room 4" /></label>
+          <label>Minutes / notes<textarea id="entry-notes" rows="4" placeholder="What was discussed? Add decisions, questions, or next steps…"></textarea></label>
+          <label>Recording <div class="upload-box"><input id="entry-recording" type="file" accept="audio/*,video/*" /><span>⌁</span><span><strong id="recording-label">Attach a recording</strong><small id="recording-status">Audio or video; stored on this device</small></span></div></label>
+          <div id="ai-section" hidden></div>
+          <div class="form-actions"><button type="button" class="button button-danger" id="delete-entry" hidden>Delete entry</button><span class="form-spacer"></span><button type="button" class="button button-outline" id="cancel-entry">Cancel</button><button type="submit" class="button button-dark">Save</button></div>
+        </form>
+      </div>
+    </div>
+    <div class="modal-backdrop" id="calendar-backdrop" hidden>
+      <div class="modal calendar-modal" role="dialog" aria-modal="true" aria-labelledby="calendar-title">
+        <button class="modal-close" id="calendar-close">×</button>
+        <p class="eyebrow">SCHEDULE</p>
+        <div class="calendar-heading"><h2 id="calendar-title">Calendar</h2><div class="calendar-navigation"><button type="button" class="button button-outline" id="calendar-previous" aria-label="Previous month">←</button><button type="button" class="button button-outline" id="calendar-next" aria-label="Next month">→</button></div></div>
+        <p class="calendar-month-label" id="calendar-month-label"></p>
+        <div class="calendar-list" id="calendar-list"></div>
+        <p class="calendar-empty" id="calendar-empty" hidden>No scheduled meetings in this month.</p>
+      </div>
+    </div>
+    <div class="modal-backdrop" id="settings-backdrop" hidden>
+        <div class="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+          <button class="modal-close" id="settings-close">×</button>
+          <p class="eyebrow">WORKSPACE SETTINGS</p><h2 id="settings-title">Settings</h2><p class="modal-subtitle">Manage your local Threadline workspace and keep a safe copy of your data.</p>
+          <div class="settings-card" id="backup-settings-card"><div><strong>Backup all processes</strong><p>Download one compressed archive containing every process, event, summary, meeting, and stored recording.</p></div><button class="button button-dark" id="settings-backup">Download backup</button></div>
+          <div class="settings-card" id="restore-settings-card"><div><strong>Restore all processes</strong><p>Load a complete Threadline backup. It replaces every process currently stored in this browser.</p></div><button class="button button-outline" id="settings-restore">Choose backup</button></div>
+          <div class="settings-section"><p class="eyebrow">DESKTOP</p><p class="settings-section-copy">Choose which objects appear on this workspace dashboard.</p><div class="dashboard-options"><label><input type="checkbox" data-dashboard-setting="process" /> Process timeline</label><label><input type="checkbox" data-dashboard-setting="upcoming" /> Coming up</label><label><input type="checkbox" data-dashboard-setting="insight" /> Threadline Insight</label></div></div>
+          <div class="settings-section"><p class="eyebrow">YOUR PROFILE</p><p class="settings-section-copy">Update your name and email address.</p><button class="button button-outline" id="edit-my-profile">Edit my information</button></div>
+          <div class="settings-section" id="admin-user-settings"><p class="eyebrow">USERS</p><p class="settings-section-copy">Each user has one separate workspace. Add, edit, or remove users here; share individual processes from the process menu.</p><div id="admin-people-list" class="people-list"></div><div class="workspace-create"><input id="admin-person-name" placeholder="Person name" /><input id="admin-person-email" placeholder="Email" /><label class="checkbox-label create-admin-label"><input id="admin-person-admin" type="checkbox" /> Admin</label><button class="button button-outline" id="admin-add-person">+ Add user</button></div></div>
+          <p class="settings-footnote">Your data is stored locally in this browser. Keep the backup file somewhere safe.</p>
+      </div>
+    </div>
+    <div class="modal-backdrop" id="delete-process-backdrop" hidden>
+      <div class="modal delete-modal" role="dialog" aria-modal="true" aria-labelledby="delete-process-title">
+        <p class="eyebrow">REMOVE PROCESS</p><h2 id="delete-process-title">Delete this process?</h2><p class="modal-subtitle">This will permanently remove the process and all of its events from this browser.</p>
+        <div class="form-actions"><button type="button" class="button button-outline" id="cancel-delete-process">Keep process</button><button type="button" class="button button-danger" id="confirm-delete-process">Delete process</button></div>
+      </div>
+    </div>
+    <div class="modal-backdrop" id="workspace-backdrop" hidden>
+        <div class="modal workspace-modal" role="dialog" aria-modal="true" aria-labelledby="workspace-title">
+          <button class="modal-close" id="workspace-close">×</button>
+          <p class="eyebrow">WORKSPACES</p><h2 id="workspace-title">Switch workspace</h2><p class="modal-subtitle">Each workspace has its own separate processes and events.</p>
+          <div id="workspace-list" class="workspace-list"></div>
+        </div>
+    </div>
+    <div class="modal-backdrop" id="share-backdrop" hidden>
+        <div class="modal share-modal" role="dialog" aria-modal="true" aria-labelledby="share-title">
+          <button class="modal-close" id="share-close">×</button>
+          <p class="eyebrow">PROCESS ACCESS</p><h2 id="share-title">Share process</h2><p class="modal-subtitle" id="share-process-name"></p>
+          <div id="share-user-list" class="share-user-list"></div>
+          <div class="form-actions"><button type="button" class="button button-outline" id="cancel-share">Cancel</button><button type="button" class="button button-dark" id="save-share">Save access</button></div>
+        </div>
+    </div>
+    <div class="modal-backdrop" id="edit-user-backdrop" hidden>
+      <div class="modal edit-user-modal" role="dialog" aria-modal="true" aria-labelledby="edit-user-title">
+        <button class="modal-close" id="edit-user-close">×</button>
+        <p class="eyebrow">EDIT USER</p><h2 id="edit-user-title">Edit user</h2><p class="modal-subtitle">Update this user’s details or grant admin privileges.</p>
+        <label>Name<input id="edit-user-name" /></label><label>Email<input id="edit-user-email" type="email" /></label><label class="checkbox-label" id="edit-user-admin-label"><input id="edit-user-admin" type="checkbox" /> Grant admin privileges</label>
+        <div class="form-actions"><button type="button" class="button button-outline" id="cancel-edit-user">Cancel</button><button type="button" class="button button-dark" id="save-edit-user">Save user</button></div>
+      </div>
+    </div>
+    <div class="toast" id="toast" role="status"></div>
+    <div class="search-popover" id="search-popover" hidden><label for="event-search">Search this process</label><div><input id="event-search" type="search" placeholder="Search titles and summaries…" /><button id="clear-search" aria-label="Clear search">×</button></div></div>
+    <input id="restore-file" type="file" accept="application/json,.json,.gz" hidden />
+    <script src="app.js"></script>
+  </body>
+</html>
