@@ -42,11 +42,11 @@ MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
 
 
 def fmt_date(d: datetime) -> str:
-    return f"{MONTHS[d.month - 1]} {d.day:02d}, {d.year}"
+    return f"{d.day:02d} {MONTHS[d.month - 1]} {d.year}"
 
 
 def iso_to_display(iso: str) -> str:
-    """Convert 'YYYY-MM-DD' to 'Sep 11, 2026'."""
+    """Convert 'YYYY-MM-DD' to '11 Sep 2026'."""
     try:
         d = datetime.strptime(iso, "%Y-%m-%d")
         return fmt_date(d)
@@ -55,12 +55,13 @@ def iso_to_display(iso: str) -> str:
 
 
 def display_to_iso(display: str) -> str:
-    """Convert 'Sep 11, 2026' to '2026-09-11'. Returns display string on failure."""
-    try:
-        d = datetime.strptime(display, "%b %d, %Y")
-        return d.strftime("%Y-%m-%d")
-    except Exception:
-        return display
+    """Convert '11 Sep 2026' to '2026-09-11'. Falls back to old 'Sep 11, 2026' format too."""
+    for fmt in ("%d %b %Y", "%b %d, %Y"):
+        try:
+            return datetime.strptime(display, fmt).strftime("%Y-%m-%d")
+        except Exception:
+            pass
+    return display
 
 
 def entry_to_dict(e: Entry) -> dict:
