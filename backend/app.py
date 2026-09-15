@@ -167,6 +167,8 @@ async def lifespan(_app: FastAPI):
     create_tables()
     with SessionLocal() as db:
         seed_database(db)
+        # Promote any upcoming meetings that have already passed
+        _promote_due_meetings(db)
     yield
 
 
@@ -497,9 +499,8 @@ def delete_upcoming(upcoming_id: str, db: Session = Depends(get_db)):
     db.commit()
 
 
-@app.post("/api/upcoming/promote")
-def promote_due_meetings(db: Session = Depends(get_db)):
-    """Move past upcoming meetings into process history."""
+def _promote_due_meetings(db: Session) -> list[str]:
+    """Move past upcoming meetings into process history. Returns list of promoted IDs."""
     now = datetime.now(timezone.utc)
     promoted = []
     meetings = db.query(Upcoming).filter(Upcoming.status == "pending").all()
@@ -535,7 +536,13 @@ def promote_due_meetings(db: Session = Depends(get_db)):
         u.completed_at = now
         promoted.append(u.id)
     db.commit()
-    return {"promoted": promoted}
+    return promoted
+
+
+@app.post("/api/upcoming/promote")
+def promote_due_meetings(db: Session = Depends(get_db)):
+    """Move past upcoming meetings into process history."""
+    return {"promoted": _promote_due_meetings(db)}
 
 
 # ── Workspaces ─────────────────────────────────────────────────────────────────

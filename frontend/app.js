@@ -698,30 +698,45 @@ $("#entry-form").addEventListener("submit", async (e) => {
 
   try {
     if (editingUpcomingId) {
-      // Update upcoming meeting
-      const updated = await API.patch(`/api/upcoming/${editingUpcomingId}`, {
+      // Update upcoming meeting — preserve the meeting's existing process association
+      const existing = (data.upcoming || []).find((m) => m.id === editingUpcomingId);
+      const procId   = process?.id   ?? existing?.processId;
+      const procName = process?.name ?? existing?.processName;
+      await API.patch(`/api/upcoming/${editingUpcomingId}`, {
         title, date: dateStr, time: timeStr, location,
         description: $("#entry-notes").value.trim(),
-        processId: process.id, processName: process.name,
+        processId: procId, processName: procName,
       });
-      const idx = data.upcoming.findIndex((m) => m.id === editingUpcomingId);
-      if (idx >= 0) data.upcoming[idx] = updated;
-      render(); closeModal(); toast("Upcoming meeting updated.");
+      // Date may have been moved to the past — run promotion check
+      const { promoted } = await API.post("/api/upcoming/promote", {});
+      if (promoted.length) {
+        await reloadState();
+        render(); closeModal(); toast("Meeting moved to history (date has passed).");
+      } else {
+        await reloadState();
+        render(); closeModal(); toast("Upcoming meeting updated.");
+      }
       return;
     }
 
     if (addingUpcomingMeeting) {
-      // Create upcoming meeting
+      // Create upcoming meeting — fall back to first process if in overview mode
+      const targetProc = process ?? data.processes[0];
+      if (!targetProc) { toast("Create a process first."); return; }
       const meeting = await API.post(`/api/workspaces/${data.activeWorkspaceId}/upcoming`, {
         title, date: dateStr, time: timeStr, location,
         description: $("#entry-notes").value.trim(),
-        processId: process.id, processName: process.name,
+        processId: targetProc.id, processName: targetProc.name,
       });
       data.upcoming.unshift(meeting);
-      // Trigger promotion check
+      // Trigger promotion check (date may already be in the past)
       const { promoted } = await API.post("/api/upcoming/promote", {});
-      if (promoted.length) await reloadState();
-      render(); closeModal(); toast("Upcoming meeting added.");
+      if (promoted.length) {
+        await reloadState();
+        render(); closeModal(); toast("Meeting added to history (date has passed).");
+      } else {
+        render(); closeModal(); toast("Upcoming meeting added.");
+      }
       return;
     }
 
