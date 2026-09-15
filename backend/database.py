@@ -106,6 +106,7 @@ class Entry(Base):
     entry_type     = Column(String, nullable=False)   # "meeting" | "note" | "milestone"
     entry_date     = Column(String, nullable=False)   # display string e.g. "Sep 11, 2026"
     sort_date      = Column(String, nullable=False)   # ISO "YYYY-MM-DD" for sorting
+    entry_time     = Column(String, nullable=True)    # "HH:MM" — preserved from upcoming meetings
     title          = Column(String, nullable=False)
     description    = Column(Text, nullable=True)
     location       = Column(String, nullable=True)
@@ -151,6 +152,16 @@ class Meta(Base):
 
 def create_tables():
     Base.metadata.create_all(bind=engine)
+    # Migrate existing databases that predate the entry_time column
+    with engine.connect() as conn:
+        cols = [row[1] for row in conn.execute(
+            __import__("sqlalchemy").text("PRAGMA table_info(entries)")
+        )]
+        if "entry_time" not in cols:
+            conn.execute(__import__("sqlalchemy").text(
+                "ALTER TABLE entries ADD COLUMN entry_time TEXT"
+            ))
+            conn.commit()
 
 
 # ── Seed data ──────────────────────────────────────────────────────────────────

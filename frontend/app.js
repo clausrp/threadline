@@ -266,8 +266,8 @@ function openEditModal(entryId) {
   $("#entry-form").querySelector("[type=submit]").textContent = "Update";
   $("#delete-entry").hidden = false;
   $("#entry-type").value = entry.type || "meeting";
-  try { $("#entry-date").value = new Date(entry.date).toISOString().slice(0, 10); } catch { $("#entry-date").value = ""; }
-  $("#entry-time").value = entry.time || "10:00";
+  $("#entry-date").value = entry.isoDate || "";
+  $("#entry-time").value = entry.time || "";
   $("#entry-title").value = entry.title || "";
   $("#entry-location").value = entry.location || "";
   $("#entry-notes").value = entry.description || "";

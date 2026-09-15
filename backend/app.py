@@ -73,6 +73,8 @@ def entry_to_dict(e: Entry) -> dict:
         "id": e.id,
         "type": e.entry_type,
         "date": e.entry_date,
+        "isoDate": e.sort_date,           # "YYYY-MM-DD" — for repopulating the date input
+        "time": e.entry_time or "",       # "HH:MM"  — preserved from upcoming meetings
         "title": e.title,
         "description": e.description or "",
         "location": e.location or "",
@@ -358,6 +360,7 @@ def create_entry(process_id: str, body: EntryCreate, db: Session = Depends(get_d
         entry_type=body.type,
         entry_date=display_date,
         sort_date=body.date,
+        entry_time=body.time or "",
         title=body.title,
         description=body.description or "Entry captured in Threadline.",
         location=body.location or "",
@@ -379,6 +382,8 @@ def update_entry(entry_id: str, body: EntryUpdate, db: Session = Depends(get_db)
     if body.date is not None:
         e.entry_date = iso_to_display(body.date)
         e.sort_date = body.date
+    if body.time is not None:
+        e.entry_time = body.time
     if body.title is not None:
         e.title = body.title
     if body.description is not None:
@@ -529,8 +534,9 @@ def _promote_due_meetings(db: Session) -> list[str]:
                 entry_type="meeting",
                 entry_date=display_date,
                 sort_date=u.meeting_date,
+                entry_time=u.meeting_time or "",
                 title=u.title,
-                description=u.description or "Upcoming meeting completed.",
+                description=u.description or "",
                 location=u.location or "",
                 tags=json.dumps(["Minutes added"]),
             )
